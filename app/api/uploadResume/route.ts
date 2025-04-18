@@ -1,6 +1,9 @@
+import axios from "axios";
+import { existsSync, mkdirSync, unlinkSync } from "fs";
 import { writeFile } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
+import { promises as fs } from "fs";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,16 +16,37 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    console.log(process.cwd());
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const filename = file.name;
-    const filepath = path.join(process.cwd(), "uploads", filename);
+    const uploadDir = path.join(process.cwd(), "uploads");
+    if (!existsSync(uploadDir)) {
+      mkdirSync(uploadDir);
+    }
 
-    await writeFile(filepath, buffer);
+    // accessing user's data
+    const filepath = path.join(uploadDir, "userdata.json");
+    if (existsSync(filepath)) {
+      const userData = await fs.readFile(filepath, "utf-8");
+      const data = JSON.parse(userData);
 
-    return NextResponse.json({ 
+      const previousFileName = data.resumeFileName;
+      const previousFilePath = path.join(uploadDir, previousFileName);
+
+      if (previousFileName && existsSync(previousFilePath)) {
+        unlinkSync(previousFilePath);
+      }
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const filePath = path.join(uploadDir, file.name);
+
+    await writeFile(filePath, uint8Array);
+
+    return NextResponse.json({
       message: "Resume uploaded successfully",
-      filepath 
+      filePath: filePath,
+      fileName: file.name,
     });
   } catch (error) {
     console.error("Error uploading resume:", error);
